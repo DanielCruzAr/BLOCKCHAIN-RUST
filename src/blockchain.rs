@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::vec;
 
+use failure::format_err;
 use log::info;
 
 use crate::block::Block;
 use crate::errors::Result;
-use crate::transaction::{TXOutput, Transaction};
+use crate::transaction::Transaction;
+use crate::tx::TXOutput;
 
 const TARGET_HEXT: usize = 4;
 const GENESIS_COINBASE_DATA: &str =
@@ -68,7 +70,7 @@ impl Blockchain {
 
     
     /// FindUnspentTransactions returns a list of transactions containing unspent outputs
-    fn find_unspent_transactions(&self, address: &str) -> Vec<Transaction> {
+    fn find_unspent_transactions(&self, address: &[u8]) -> Vec<Transaction> {
         let mut spent_txs: HashMap<String, Vec<i32>> = HashMap::new();
         let mut unspent_txs: Vec<Transaction> = Vec::new();
         
@@ -107,7 +109,7 @@ impl Blockchain {
     }
     
     /// FindUTXO finds and returns all unspent transaction outputs
-    pub fn find_utxo(&self, address: &str) -> Vec<TXOutput> {
+    pub fn find_utxo(&self, address: &[u8]) -> Vec<TXOutput> {
         let mut utxos = Vec::<TXOutput>::new();
         let unspent_txs = self.find_unspent_transactions(address);
         for tx in unspent_txs {
@@ -123,7 +125,7 @@ impl Blockchain {
     /// FindUnspentTransactions returns a list of transactions containing unspent outputs
     pub fn find_spendable_outputs(
         &self,
-        address: &str,
+        address: &[u8],
         amount: i32,
     ) -> (i32, HashMap<String, Vec<i32>>) {
         let mut unspent_outputs: HashMap<String, Vec<i32>> = HashMap::new();
@@ -156,6 +158,40 @@ impl Blockchain {
             bc: &self,
         }
     }
+
+    /// FindTransactions finds a transaction by its ID
+    pub fn find_transaction(&self, id: &str) -> Result<Transaction> {
+        for b in self.iter() {
+            for tx in b.get_transaction() {
+                if tx.id == id {
+                    return Ok(tx.clone());
+                }
+            }
+        }
+        Err(format_err!("Transaction is not found"))
+    }
+
+    fn get_prev_txs(&self, tx: &Transaction) -> Result<HashMap<String, Transaction>> {
+        let mut prev_txs = HashMap::new();
+        for vin in &tx.vin {
+            let prev_tx = self.find_transaction(&vin.txid)?;
+            prev_txs.insert(prev_tx.id.clone(), prev_tx);
+        }
+        Ok(prev_txs)
+    }
+
+    /// SignTransaction signs inputs of a Transaction
+    pub fn sign_transaction(&self, tx: &mut Transaction, private_key: &[u8]) -> Result<()> {
+        let prev_txs = self.get_prev_txs(tx)?;
+        tx.sign(private_key, prev_txs)?;
+        Ok(())
+    }
+
+    /// VerifyTransaction verifies transaction input signatures
+    pub fn verify_transaction(&self, tx: &mut Transaction) -> Result<bool> {
+        let prev_txs = self.get_prev_txs(tx)?;
+        tx.verify(prev_txs)
+    }
 }
 
 impl<'a> Iterator for BlockchainIter<'a> {
@@ -178,22 +214,3 @@ impl<'a> Iterator for BlockchainIter<'a> {
         None
     }
 }
-
-/*
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_add_block() {
-        let mut b = Blockchain::new().unwrap();
-        let d1 = b.add_block("data 1".to_string());
-        let d2 = b.add_block("data 2".to_string());
-        let d3 = b.add_block("data 3".to_string());
-
-        for item in b.iter() {
-            println!("item {:?}", item);
-        }
-    }
-}
-*/

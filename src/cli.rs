@@ -1,10 +1,12 @@
 use std::process::exit;
 use std::vec;
 
+use bitcoincash_addr::Address;
 use clap::{Arg, Command};
 use crate::blockchain::Blockchain;
 use crate::errors::Result;
 use crate::transaction::Transaction;
+use crate::wallet::Wallets;
 
 pub struct Cli {}
 
@@ -43,6 +45,8 @@ impl Cli {
                     .required(true)),
             )
             .subcommand(Command::new("printchain").about("Print all the blocks of the blockchain"))
+            .subcommand(Command::new("createwallet").about("Create a new wallet"))
+            .subcommand(Command::new("listaddresses").about("List all addresses"))
             .get_matches();
         
         if let Some(ref matches) = matches.subcommand_matches("create") {
@@ -58,9 +62,9 @@ impl Cli {
     
         if let Some(ref matches) = matches.subcommand_matches("getbalance") {
             if let Some(address) = matches.get_one::<String>("ADDRESS") {
-                let address = String::from(address);
+                let pub_key_hash = Address::decode(address).unwrap().body;
                 let bc = Blockchain::new()?;
-                let utxos = bc.find_utxo(&address);
+                let utxos = bc.find_utxo(&pub_key_hash);
                 let mut balance = 0;
                 for out in utxos {
                     balance += out.value;
@@ -98,6 +102,21 @@ impl Cli {
 
         if let Some(ref _matches) = matches.subcommand_matches("printchain") {
             cmd_print_chain()?;
+        }
+
+        if let Some(_) = matches.subcommand_matches("createwallet") {
+            let mut ws = Wallets::new()?;
+            let address = ws.create_wallet();
+            ws.save_all()?;
+            print!("Wallet created: {}\n", address);
+        }
+
+        if let Some(_) = matches.subcommand_matches("listaddresses") {
+            let ws = Wallets::new()?;
+            let addresses = ws.get_all_addresses();
+            for address in addresses {
+                println!("{}", address);
+            }
         }
 
         Ok(())
