@@ -4,7 +4,7 @@ use crypto::{digest::Digest, ed25519, sha2::Sha256};
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use log::error;
-use crate::{blockchain::Blockchain, errors::Result, tx::{TXInput, TXOutput}, wallet::{hash_pub_key, Wallets}};
+use crate::{blockchain::Blockchain, errors::Result, tx::{TXInput, TXOutput}, utxoset::UTXOSet, wallet::{hash_pub_key, Wallets}};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Transaction {
@@ -34,7 +34,7 @@ impl Transaction {
     }
 
     /// NewUTXO creates a new transaction
-    pub fn new_utxo(from: &str, to: &str, amount: i32, bc: &Blockchain) -> Result<Transaction> {
+    pub fn new_utxo(from: &str, to: &str, amount: i32, bc: &UTXOSet) -> Result<Transaction> {
         let mut vin = Vec::new();
 
         let wallets = Wallets::new()?;
@@ -49,7 +49,7 @@ impl Transaction {
         let mut pub_key_hash = wallet.public_key.clone();
         hash_pub_key(&mut pub_key_hash);
 
-        let acc_v = bc.find_spendable_outputs(&pub_key_hash, amount);
+        let acc_v = bc.find_spendable_outputs(&pub_key_hash, amount)?;
         if acc_v.0 < amount {
             error!("Not Enough balance");
             return Err(format_err!("Not Enough balance: current balance {}", acc_v.0));
@@ -90,7 +90,7 @@ impl Transaction {
             vout,
         };
         tx.id = tx.hash()?;
-        bc.sign_transaction(&mut tx, &wallet.private_key)?;
+        bc.blockchain.sign_transaction(&mut tx, &wallet.private_key)?;
         Ok(tx)
     }
 

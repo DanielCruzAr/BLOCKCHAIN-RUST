@@ -6,6 +6,7 @@ use clap::{Arg, Command};
 use crate::blockchain::Blockchain;
 use crate::errors::Result;
 use crate::transaction::Transaction;
+use crate::utxoset::UTXOSet;
 use crate::wallet::Wallets;
 
 pub struct Cli {}
@@ -44,6 +45,7 @@ impl Cli {
                     .arg(Arg::new("AMOUNT")
                     .required(true)),
             )
+            .subcommand(Command::new("reindex").about("Rebuilds the UTXO set"))
             .subcommand(Command::new("printchain").about("Print all the blocks of the blockchain"))
             .subcommand(Command::new("createwallet").about("Create a new wallet"))
             .subcommand(Command::new("listaddresses").about("List all addresses"))
@@ -52,7 +54,9 @@ impl Cli {
         if let Some(ref matches) = matches.subcommand_matches("create") {
             if let Some(address) = matches.get_one::<String>("ADDRESS") {
                 let address = String::from(address);
-                Blockchain::create_blockchain(address.clone())?;
+                let bc = Blockchain::create_blockchain(address.clone())?;
+                let utxo_set = UTXOSet { blockchain: bc };
+                utxo_set.reindex()?;
                 print!("create blockchain \n")
             }
             /*else {
@@ -64,9 +68,12 @@ impl Cli {
             if let Some(address) = matches.get_one::<String>("ADDRESS") {
                 let pub_key_hash = Address::decode(address).unwrap().body;
                 let bc = Blockchain::new()?;
-                let utxos = bc.find_utxo(&pub_key_hash);
+                // let utxos = bc.find_utxo(&pub_key_hash);
+                let utxo_set = UTXOSet { blockchain: bc };
+                let utxos = utxo_set.find_utxo(&pub_key_hash)?;
                 let mut balance = 0;
-                for out in utxos {
+                
+                for out in utxos.outputs {
                     balance += out.value;
                 }
                 println!("Balance of '{}': {}", address, balance);
@@ -94,12 +101,25 @@ impl Cli {
                 println!("from not supply!: usage");
                 exit(1)
             };
-            let mut bc = Blockchain::new()?;
-            let tx = Transaction::new_utxo(from, to, amount, &bc)?;
-            bc.add_block(vec![tx])?;
+            
+            let bc = Blockchain::new()?;
+            let mut utxo_set = UTXOSet { blockchain: bc };
+            let tx = Transaction::new_utxo(from, to, amount, &utxo_set)?;
+            let cbtx = Transaction::new_coinbase(from.to_string(), String::from("reward!"))?;
+            let new_block = utxo_set.blockchain.add_block(vec![cbtx, tx])?;
+
+            utxo_set.update(&new_block)?;
             print!("success! \n");
         }
 
+        if let Some(_) = matches.subcommand_matches("reindex") {
+            let bc = Blockchain::new()?;
+            let utxo_set = UTXOSet { blockchain: bc };
+            utxo_set.reindex()?;
+            let count = utxo_set.count_transactions()?;
+            print!("Done! There are {} transactions in the UTXO set.", count);
+        }
+        
         if let Some(ref _matches) = matches.subcommand_matches("printchain") {
             cmd_print_chain()?;
         }

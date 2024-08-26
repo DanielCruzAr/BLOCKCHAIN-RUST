@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 use crate::errors::Result;
 use crate::wallet::hash_pub_key;
 
+/// TXOutputs collects TXOutput
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TXOutputs {
+    pub outputs: Vec<TXOutput>,
+}
+
 /// Transaction Input
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TXInput {
@@ -45,6 +51,11 @@ impl TXOutput {
         debug!("Lock: {}", address);
         self.pub_key_hash = pub_key_hash;
         Ok(())
+    }
+
+    /// IsLockedWithKey checks if the output can be used by the owner of the public key
+    pub fn is_locked_with_key(&self, pub_key_hash: &[u8]) -> bool {
+        self.pub_key_hash == pub_key_hash
     }
 
     /// CanUnlockOutputWith checks whether the address initiated the transaction
