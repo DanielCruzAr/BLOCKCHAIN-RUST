@@ -4,6 +4,8 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use log::info;
 use serde::{Deserialize, Serialize};
+use merkle_cbt::merkle_tree::Merge;
+use merkle_cbt::merkle_tree::CBMT;
 
 const TARGET_HEXT: usize = 4;
 
@@ -62,10 +64,20 @@ impl Block {
         Ok(())
     }
 
+    /// HashTransactions returns a hash of the transactions in the block
+    fn hash_transactions(&self) -> Result<Vec<u8>> {
+        let mut tx_hashes = Vec::new();
+        for tx in &self.transactions {
+            tx_hashes.push(tx.hash()?.as_bytes().to_owned());
+        }
+        let tree = CBMT::<Vec<u8>, MergeTX>::build_merkle_tree(&tx_hashes);
+        Ok(tree.root())
+    }
+
     fn prepare_hash_data(&self) -> Result<Vec<u8>> {
         let content = (
             self.prev_block_hash.clone(),
-            self.transactions.clone(),
+            self.hash_transactions()?,
             self.timestamp,
             TARGET_HEXT,
             self.nonce
@@ -81,5 +93,22 @@ impl Block {
         let mut vec1: Vec<u8> = vec![];
         vec1.resize(TARGET_HEXT, '0' as u8);
         Ok(&hasher.result_str()[0..TARGET_HEXT] == String::from_utf8(vec1)?)
+    }
+}
+
+
+struct MergeTX {}
+
+impl Merge for MergeTX {
+    type Item = Vec<u8>;
+    
+    fn merge(left: &Self::Item, right: &Self::Item) -> Self::Item {
+        let mut hasher = Sha256::new();
+        let mut data: Vec<u8> = left.clone();
+        data.append(&mut right.clone());
+        hasher.input(&data);
+        let mut re: [u8; 32] = [0; 32];
+        hasher.result(&mut re);
+        re.to_vec()
     }
 }

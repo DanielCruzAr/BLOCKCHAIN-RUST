@@ -4,7 +4,7 @@ use crypto::{digest::Digest, ed25519, sha2::Sha256};
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use log::error;
-use crate::{blockchain::Blockchain, errors::Result, tx::{TXInput, TXOutput}, utxoset::UTXOSet, wallet::{hash_pub_key, Wallets}};
+use crate::{errors::Result, tx::{TXInput, TXOutput}, utxoset::UTXOSet, wallet::{hash_pub_key, Wallets}};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Transaction {
@@ -166,9 +166,10 @@ impl Transaction {
         Ok(true)
     }
 
-    fn hash(&mut self) -> Result<String> {
-        self.id = String::new();
-        let data = bincode::serialize(self)?;
+    pub fn hash(&self) -> Result<String> {
+        let mut copy = self.clone();
+        copy.id = String::new();
+        let data = bincode::serialize(&copy)?;
         let mut hasher = Sha256::new();
         hasher.input(&data[..]);
         Ok(hasher.result_str())
