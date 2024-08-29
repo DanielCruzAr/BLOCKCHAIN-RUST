@@ -6,6 +6,7 @@ mod errors;
 mod cli;
 mod wallet;
 mod utxoset;
+mod server;
 
 use errors::Result;
 use cli::Cli;

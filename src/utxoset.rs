@@ -15,7 +15,7 @@ pub struct UTXOSet {
 impl UTXOSet {
     /// Reindex rebuilds the UTXO set
     pub fn reindex(&self) -> Result<()> {
-        if let Err(e) = std::fs::remove_dir_all("data/utxos") {
+        if let Err(_) = std::fs::remove_dir_all("data/utxos") {
             info!("There are not any UTXOs to delete.")
         }
         let db = sled::open("data/utxos")?;

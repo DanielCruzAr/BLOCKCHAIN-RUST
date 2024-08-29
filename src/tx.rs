@@ -2,7 +2,6 @@ use bitcoincash_addr::Address;
 use log::debug;
 use serde::{Deserialize, Serialize};
 use crate::errors::Result;
-use crate::wallet::hash_pub_key;
 
 /// TXOutputs collects TXOutput
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,15 +23,6 @@ pub struct TXInput {
 pub struct TXOutput {
     pub value: i32,
     pub pub_key_hash: Vec<u8>,
-}
-
-impl TXInput {
-    /// CanUnlockOutputWith checks whether the address initiated the transaction
-    pub fn can_unlock_output_with(&self, unlocking_data: &[u8]) -> bool {
-        let mut pubkeyhash = self.pub_key.clone();
-        hash_pub_key(&mut pubkeyhash);
-        pubkeyhash == unlocking_data
-    }
 }
 
 impl TXOutput {

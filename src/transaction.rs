@@ -4,7 +4,7 @@ use crypto::{digest::Digest, ed25519, sha2::Sha256};
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use log::error;
-use crate::{blockchain::Blockchain, errors::Result, tx::{TXInput, TXOutput}, utxoset::UTXOSet, wallet::{hash_pub_key, Wallets}};
+use crate::{errors::Result, tx::{TXInput, TXOutput}, utxoset::UTXOSet, wallet::{hash_pub_key, Wallet}};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Transaction {
@@ -34,17 +34,8 @@ impl Transaction {
     }
 
     /// NewUTXO creates a new transaction
-    pub fn new_utxo(from: &str, to: &str, amount: i32, bc: &UTXOSet) -> Result<Transaction> {
+    pub fn new_utxo(wallet: &Wallet, to: &str, amount: i32, bc: &UTXOSet) -> Result<Transaction> {
         let mut vin = Vec::new();
-
-        let wallets = Wallets::new()?;
-        let wallet = match wallets.get_wallet(from) {
-            Some(w) => w,
-            None => return Err(format_err!("{} wallet not found", from)),
-        };
-        if let None = wallets.get_wallet(&to) {
-            return Err(format_err!("{} wallet not found", to))
-        };
 
         let mut pub_key_hash = wallet.public_key.clone();
         hash_pub_key(&mut pub_key_hash);
@@ -78,7 +69,7 @@ impl Transaction {
             vout.push(
                 TXOutput::new(
                     acc_v.0 - amount,
-                    from.to_string()
+                    wallet.get_address()
                 )?
             )
         }
@@ -132,7 +123,7 @@ impl Transaction {
         Ok(())
     }
 
-    pub fn verify(&mut self, prev_txs: HashMap<String, Transaction>) -> Result<bool> {
+    pub fn verify(&self, prev_txs: HashMap<String, Transaction>) -> Result<bool> {
         if self.is_coinbase() {
             return Ok(true);
         }
